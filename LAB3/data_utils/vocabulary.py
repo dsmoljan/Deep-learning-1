@@ -77,21 +77,75 @@ class Vocabulary:
             embeddings_dict = dict()
             # učitavamo datoteku s embeddinzima tokena i spremamo ih u rječnik
             with open(path, 'r') as file:
-                line = file.readline()
-                ind = line.find(" ")
-                token = line[0:ind]
+                while(True):
+                    line = file.readline()
+                    if not line:
+                        break
+                    ind = line.find(" ")
+                    token = line[0:ind]
+                    #print(token)
 
-                x = np.array(['1.1', '2.2', '3.3'])
-                y = x.astype(np.float)
+                    #pdb.set_trace()
 
-                vector_reps = np.array(line[ind+1::].split(" ")).astype(np.float)
-                embeddings_dict.update({token:vector_reps})
+                    x = np.array(['1.1', '2.2', '3.3'])
+                    y = x.astype(np.float)
+
+                    vector_reps = np.array(line[ind+1::].split(" ")).astype(np.float)
+                    embeddings_dict.update({token:vector_reps})
         
             # na osnovu embedding rječnika i tokena iz rječnika kreiramo
             # embedding matricu
-            i = 1
+            i = 2
+            #pdb.set_trace()
             for token in self.stoi_dict.keys():
+                if (token == "<UNK>" or token == "<PAD>"):
+                    #print("Skipping:",token)
+                    continue
                 if (token in embeddings_dict):
+                    #print("Ovdje:", token)
+                    embedding_matrix[i] = embeddings_dict[token]
+                i += 1
+        
+        # vraćamo ju u optimiziranom omotaču
+        embedding_matrix_tensor = torch.FloatTensor(embedding_matrix)
+        return torch.nn.Embedding.from_pretrained(embedding_matrix_tensor, freeze = freeze, padding_idx = 0)
+        
+        def get_embedding_matrix(self, path = None):
+        V_size = len(self.stoi_dict)
+        embedding_matrix = np.random.normal(0, 1, size = (V_size, DIM))
+        embedding_matrix[0] = np.zeros(DIM)
+        freeze = False
+        if (path != None):
+            freeze = True
+            embeddings_dict = dict()
+            # učitavamo datoteku s embeddinzima tokena i spremamo ih u rječnik
+            with open(path, 'r') as file:
+                while(True):
+                    line = file.readline()
+                    if not line:
+                        break
+                    ind = line.find(" ")
+                    token = line[0:ind]
+                    #print(token)
+
+                    #pdb.set_trace()
+
+                    x = np.array(['1.1', '2.2', '3.3'])
+                    y = x.astype(np.float)
+
+                    vector_reps = np.array(line[ind+1::].split(" ")).astype(np.float)
+                    embeddings_dict.update({token:vector_reps})
+        
+            # na osnovu embedding rječnika i tokena iz rječnika kreiramo
+            # embedding matricu
+            i = 2
+            #pdb.set_trace()
+            for token in self.stoi_dict.keys():
+                if (token == "<UNK>" or token == "<PAD>"):
+                    #print("Skipping:",token)
+                    continue
+                if (token in embeddings_dict):
+                    #print("Ovdje:", token)
                     embedding_matrix[i] = embeddings_dict[token]
                 i += 1
         

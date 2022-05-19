@@ -9,26 +9,30 @@ import pdb
 from utils import eval_perf_binary
 from data_utils.data_utils import pad_collate_fn
 
-SAVE_DIR = Path(__file__).parent / 'task2/'
+SAVE_DIR = Path(__file__).parent / 'task3/'
 
-class PoolNet(nn.Module):
+class VanillaRNN(nn.Module):
     def __init__(self, embedding_matrix):
         super().__init__()
     
         self.embedding_matrix = embedding_matrix
 
-        # pool treba nekako drugačije implementirati, jer ovisi o T
-        # a T je duljina trenutnog batcha jel
-
-        self.fc1 = nn.Linear(300, 150, bias = True)
-        self.fc2 = nn.Linear(150, 150, bias = True)
+        # 300 = input_size
+        # 150 = number of params for one hidden state (cell)
+        # 2 = number of RNN layers
+        self.rnn = nn.RNN(300, 150, 2)
+        self.fc1 = nn.Linear(150, 150, bias = True)
         self.fc_logits = nn.Linear(150, 1, bias = True)
 
         # inicijalizacija parametara
         self.reset_parameters()
     
+    # TODO - prilagodi tako da uključiš i RNN slojeve
     def reset_parameters(self):
         for m in self.modules():
+#             if isinstance(m, nn.RNN):
+#                 nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='tanh')
+#                 nn.init.constant_(m.bias, 0)
             if isinstance(m, nn.Linear) and m is not self.fc_logits:
                 nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
                 nn.init.constant_(m.bias, 0)
@@ -39,44 +43,46 @@ class PoolNet(nn.Module):
     # dakle npr. [32, 17, 1, 288, 3876, 1, 8976] -> njegova duljina je parametar T
     # i prije puštanja kroz mrežu treba ga pretvoriti 
     # u vektor korištenjem self.embedding_matrix
+    # TODO - prilagodi RNN slojevima
     def forward(self, x_ind):
         
         # pretvori x u vektor floatova koristeći embedding matricu
-        # imaj na umu da ti je self.embedding_matrix objekt tipa torch.nnEmbedding 
-        # poseban objekt koji je baš prilagođen za dohvat vektora riječi po njihovim indeksima
-        # tj. mislim da se može ovako koristiti: https://stackoverflow.com/questions/50747947/embedding-in-pytorch
-        # x_ind.shape = [batch_size, T, embedding_lenght], gdje je T sequence size
-        x_vec = self.embedding_matrix(x_ind)
-        T = x_vec.shape[1]
-        #pool_layer = nn.AvgPool1d(T) #-- ovo ne radi :(
-        p1 = torch.mean(x_vec, dim= 1)
-        #p1 = pool_layer(x_vec)
-        #pdb.set_trace()
-        # nakon avg_pool oblik je [batch_size, sequence_length]
-        # eventualno će trebati squeezati
+        # treba paziti da nam sad x mora biti u obliku [T, batch, sequence_length], a NE [batch, T, sequence_length] što je default oblik x_vec
+        x_vec = self.embedding_matrix(x_ind)#
+        #T = x_vec.shape[1]
         
-        s1 = self.fc1(p1)
-        h1 = torch.relu(s1)
+        # nakon ovog transponiranja oblik je [T, batch, sequence_length]
+        x_vec = torch.transpose(x_vec, 0, 1)
         
-        s2 = self.fc2(h1)
+        # ako ne damo inicijalno stanje za skrivene slojeve, jednostavno se koristi 0
+        last_layer_features, hidden = self.rnn(x_vec)
+        # last_layer_features - sadrži izlazne feature iz zadnjeg sloja RNN-a za svaki t
+        # hidden = tenzor sa zadnjim skrivenim stanjem svakog elementa iz batcha
+        
+        # po uputama iz vježbe, kao ulaz u FC sloj dajemo  skriveno stanje iz zadnjeg sloja u zadnjem vremenskom koraku
+        s1 = last_layer_features[-1]
+        
+        s2 = self.fc1(s1)
         h2 = torch.relu(s2)
-        
+
         logits = self.fc_logits(h2)
         logits = torch.squeeze(logits)
 
         return logits
     
+    # TODO - prilagodi, dodaj i RNN slojeve
     def get_params(self):
         param_list = []
         
+        param_list.extend(self.rnn.parameters())
         param_list.extend(self.fc1.parameters())
-        param_list.extend(self.fc2.parameters())
         param_list.extend(self.fc_logits.parameters())
         
         # parametri embedding matrice, mozda...?
         
         return param_list
     
+    # ovo bi trebalo biti isto
     def train(self, train_dataset, val_dataset, no_epochs = 10, lr = 1e-2, weight_decay = 0, batch_size = 1):
         self.cuda()
         
@@ -150,11 +156,6 @@ class PoolNet(nn.Module):
         self.load_state_dict(best_params)
         #plot_training_progress(SAVE_DIR, plot_data)
          
-      # ovo je krivo! ne koristiti argmax lol      
-#     def predict(self, x_ind):
-#         x_vec = self.embedding_matrix(x_ind)
-#         return torch.argmax(self.forward(x_vec))
-    
     def evaluate(self, dataloader_val, batch_size = 1):
         #self.eval()
         bce_loss = nn.BCEWithLogitsLoss()

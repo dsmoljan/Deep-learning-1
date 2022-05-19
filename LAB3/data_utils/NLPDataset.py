@@ -11,7 +11,7 @@ class NLPDataset(torch.utils.data.Dataset):
     # moramo podržati predavanje vokabulara u konstruktoru
     # jer su valid i test Vocabulariyi jednkai kao
     # vocabi od train skupa
-    def __init__(self, path, data_voc: Vocabulary = None, label_voc: Vocabulary = None, vocab_max_size = 10000, vocab_min_freq = 1):
+    def __init__(self, path, data_voc: Vocabulary = None, label_voc: dict = None, vocab_max_size = 100000, vocab_min_freq = 1):
         self.data_voc = data_voc
         self.label_voc = label_voc
         self.instances = []
@@ -32,9 +32,7 @@ class NLPDataset(torch.utils.data.Dataset):
             self.data_voc = Vocabulary(freq_dict, vocab_max_size, vocab_min_freq)
             print("Kreiram svoj data vocabulary")
         if (label_voc == None):
-            freq_dict = get_frequencies_labels(self.instances)
-            self.label_voc = Vocabulary(freq_dict, 4, 1)
-            print("Kreiram svoj label vocabulary")
+            self.label_voc = {"negative":0, "positive":1}
     
     def __len__(self):
         return len(self.instances)
@@ -44,12 +42,12 @@ class NLPDataset(torch.utils.data.Dataset):
         
         instance = self.instances[index]
         token_list = instance.token_list
-        label = list([instance.label])
+        label = instance.label.strip()
         
         #pdb.set_trace()
         
         index_list_tensor = torch.tensor(self.data_voc.encode(token_list))
-        label_index_tensor = torch.tensor(self.label_voc.encode(label))
+        label_index_tensor = torch.tensor(self.label_voc[label])
         
         return index_list_tensor, label_index_tensor
         

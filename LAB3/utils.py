@@ -1,4 +1,8 @@
+import matplotlib.pyplot as plt 
+import matplotlib
+from matplotlib.pyplot import figure
 import numpy as np
+
 
 def eval_perf_binary(Y, Y_):
     tp = sum(np.logical_and(Y == Y_, Y_ == True))
@@ -78,3 +82,24 @@ def plot_training_progress(save_dir, data):
     save_path = os.path.join(save_dir, "training_plot.png")
     print("Plotting in: ", save_path)
     plt.savefig(save_path)
+
+def draw_table(column_headers, row_headers, cell_text, title):
+  rcolors = plt.cm.BuPu(np.full(len(row_headers), 0.1))
+  ccolors = plt.cm.BuPu(np.full(len(column_headers), 0.1))
+
+  matplotlib.rcParams["figure.dpi"] = 200
+
+  fig, ax = plt.subplots() 
+  ax.set_axis_off() 
+  table = ax.table( 
+      cellText = cell_text,  
+      rowLabels = row_headers,  
+      colLabels = column_headers, 
+      rowColours = rcolors,  
+      colColours = ccolors, 
+      cellLoc ='center',  
+      loc ='upper left')     
+    
+  ax.set_title(title,fontweight ="bold") 
+    
+  plt.show()
